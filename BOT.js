@@ -273,6 +273,7 @@ var killer = {
     this.plnum = 0;
     this.clnum = 0;
     this.gamestart = false;
+
   }
 };
 
@@ -282,9 +283,10 @@ bot.on("message", msg => {
   {
     msg.channel.send("<遊戲>殺手 已受理 請開始報名");
     killer.joinstart = true;
+    killer.channel = msg.channel;
   }
   //受理報名
-  if (msg.content == config.prefix + "join" && killer.joinstart)
+  if (msg.content == config.prefix + "join" && killer.joinstart && msg.channel==killer.channel)
   {
     var newplayer = msg.author;
     if(killer.userid.includes(newplayer.id))
@@ -301,14 +303,13 @@ bot.on("message", msg => {
     console.log(newplayer.username+" joined.");
   }
   //調配人數
-  if (msg.content == config.prefix + "RD")
+  if (msg.content == config.prefix + "RD" && msg.channel==killer.channel && killer.joinstart)
   {
     if(killer.user.length < 6)
     {
       msg.reply("你都玩人這麼少的殺手嗎 再找一些人來玩吧");
       return;
     }
-    killer.channel = msg.channel;
     //隨機打亂 https://www.w3schools.com/js/js_array_sort.asp
     killer.user.sort(function(a, b){return 0.5 - Math.random()});
     killer.renewid();
@@ -352,8 +353,9 @@ bot.on("message", msg => {
     killer.user.sort(function(a, b){return 0.5 - Math.random()});
     killer.renewid();
     killer.gamestart = true;
-    killer.klr = 0;
-    killer.plr = 0;
+    killer.joinstart = false;
+    killer.klo = -1;
+    killer.plo = -1;
     killer.alnum = killer.user.length;
     msg.channel.send("遊戲開始 玩家代號如下:");
     for(var i = 0; i <= killer.user.length; i++)
@@ -536,7 +538,7 @@ bot.on("message", msg => {
     }
     if(!killer.night)
     {
-      if(msg.content.slice(0, config.prefix.length) == config.prefix)
+      if(msg.content.slice(0, config.prefix.length) == config.prefix && msg.channel==killer.channel)
       {
         var content = msg.content.slice(config.prefix.length);
         if(!isNaN(parseInt(content)) && killer.user[index].vote == -1)
