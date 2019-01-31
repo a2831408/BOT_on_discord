@@ -1,8 +1,9 @@
 const Discord = require("discord.js");
 const config = require("./config.json");
+const ytdl = require("ytdl-core");
 const bot = new Discord.Client();
 var talks = 0;
-var guessnumber = false, number1 = -1, number2 = new Array();
+var guess = {dm:{}};//guessnumber data
 var bingo = false;
 player1 = new Object();
 player2 = new Object();
@@ -28,21 +29,42 @@ bot.on("ready" , () => {
   console.log(bot.user.tag + " is ready!!")
 });
 
-
 bot.on("message" , msg => {
-    if(msg.content.includes("王淯"))
+    if(msg.content.includes("王淯")&&(!msg.content.includes("鄭丞傑")))
     {
       talks++;
       msg.channel.send("學霸被叫了" + talks + "次了!!");
     }
-    if(msg.content.includes("akari"))
-    msg.channel.send("はい～ゆるゆり～はじまるよ～～");
+    if(msg.content == "akari")
+    {
+      msg.channel.send("は～い！ ゆるゆり、はっじまっるよ～！！");
+    }
+    if(msg.content == "explosion")
+    {
+      if (msg.member.voiceChannel) {
+        msg.member.voiceChannel.join()
+          .then(connection => {
+            const explo = connection.playFile("D:\\node.js\\discord.js\\voice\\explosion.mp3");
+            msg.channel.send("黒より黒く闇より暗き漆黒に我が深紅の混淆を望みたもう。");
+            setTimeout(()=>{msg.channel.send("覚醒のとき来たれり。");},8000);
+            setTimeout(()=>{msg.channel.send("無謬の境界に落ちし理。");},10000);
+            setTimeout(()=>{msg.channel.send("無行の歪みとなりて現出せよ！");},13000);
+            setTimeout(()=>{msg.channel.send("踊れ踊れ踊れ、");},15000);
+            setTimeout(()=>{msg.channel.send("我が力の奔流に望むは崩壊なり。");},18000);
+            setTimeout(()=>{msg.channel.send("並ぶ者なき崩壊なり。");},22000);
+            setTimeout(()=>{msg.channel.send("万象等しく灰塵に帰し、深淵より来たれ！");},24000);
+            setTimeout(()=>{msg.channel.send("これが人類最大の威力の攻撃手段、これこそが究極の攻撃魔法、");},28000);
+            setTimeout(()=>{msg.channel.send("エクスプロージョン！");},35000);
+          })
+          .catch(console.log);
+      }
+    }
 });
 
 bot.on("message", msg =>{
   if(msg.author.id === config.ownerID && msg.content === config.prefix+"reset")
   {
-    guessnumber = false;
+    guess = {dm:{}};
     bingo = false;
     jyankenlist = [];
     jyanken2 = {user:[],userid:[]}
@@ -51,27 +73,59 @@ bot.on("message", msg =>{
 });//resetdata
 
 bot.on("message", msg =>{
-  if(guessnumber && msg.author === player1 && (!isNaN(parseInt(msg.content))))
+  if((!isNaN(parseInt(msg.content))))
   {
-    rrr = parseInt(msg.content)
-    if(rrr == number1)
+    rrr = parseInt(msg.content);
+    if(msg.guild)
     {
-      msg.reply("Congratulation!!You got it");
-      guessnumber = false;
+      if(!guess.hasOwnProperty(msg.guild.id))
+      guess[msg.guild.id] = {};
+      if(guess[msg.guild.id].hasOwnProperty(msg.author.id))
+      {
+        if(rrr < 101 && rrr > 0)
+        {
+          if(rrr == guess[msg.guild.id][msg.author.id])
+          {
+            delete guess[msg.guild.id][msg.author.id];
+            return msg.reply("Congratulation!!You got it");
+          }
+          return rrr > guess[msg.guild.id][msg.author.id] ? msg.reply("Smaller"):msg.reply("Larger");
+        }
+      }
     }
-    else if(rrr > number1 && rrr < 101)
-    msg.reply("Smaller");
-    else if(rrr < number1 && rrr > 0)
-    msg.reply("Larger");
-    return;
+    if(msg.channel.type==="dm" && guess.dm.hasOwnProperty(msg.author.id))
+    {
+      if(rrr < 101 && rrr > 0)
+      {
+        if(rrr == guess.dm[msg.author.id])
+        {
+          delete guess.dm[msg.author.id];
+          return msg.channel.send("Congratulation!!You got it");
+        }
+        return rrr > guess.dm[msg.author.id] ? msg.channel.send("Smaller"):msg.channel.send("Larger");
+      }
+    }
   }
-  if(msg.content==config.prefix+"猜數字"&&(!guessnumber))
+  if(msg.content==config.prefix+"猜數字")
   {
-    guessnumber = true;
-    msg.reply("say a number from 1~100");
-    number1 = Math.ceil(Math.random()*100);
-    console.log(number1);
-    player1 = msg.author;
+    if(msg.guild)
+    {
+      if(!guess.hasOwnProperty(msg.guild.id))
+      guess[msg.guild.id] = {};
+      if(guess[msg.guild.id].hasOwnProperty(msg.author.id))
+      return msg.reply("You have already joined the game.");
+      guess[msg.guild.id][msg.author.id] = Math.ceil(Math.random()*100);
+      console.log(msg.guild.name +" "+ msg.author.username + " " + guess[msg.guild.id][msg.author.id]);
+      return msg.reply("say a number from 1~100");
+    }
+    if(msg.channel.type==="dm")
+    {
+      if(guess.dm.hasOwnProperty(msg.author.id))
+      return msg.channel.send("You have already joined the game.");
+      guess.dm[msg.author.id] = Math.ceil(Math.random()*100);
+      console.log(msg.author.username + " dm " + guess.dm[msg.author.id]);
+      return msg.channel.send("say a number from 1~100");
+    }
   }
 });//guessnumber
 
@@ -273,13 +327,16 @@ var killer = {
     this.plnum = 0;
     this.clnum = 0;
     this.gamestart = false;
-
+    this.klr = false;
+    this.plr = false;
+    this.klo = -1;
+    this.plo = -1;
   }
 };
 
 bot.on("message", msg => {
   //申請遊戲
-  if (msg.content == config.prefix + "Mafia" )
+  if (msg.content == config.prefix + "Mafia" && msg.channel.type != "text")
   {
     msg.channel.send("<遊戲>殺手 已受理 請開始報名");
     killer.joinstart = true;
@@ -390,20 +447,40 @@ bot.on("message", msg => {
               }
               return;
             }
+            //殺手取消投票
+            if(content.slice(0,1)=="C" && killer.user[index].vote != -1)
+            {
+              killer.user[index].kvote--;
+              if(killer.user[index].vote == killer.plo)
+              {
+                for(var i = 0; i < killer.userid.length; i++)
+                {
+                  if(killer.user[i].pvote > killer.user[killer.plo].pvote)
+                  killer.plo = i;
+                }
+              }
+              killer.user[index].vote = -1;
+              msg.author.send("已取消投票!!");
+            }
             //殺手投票阿
-            if(!isNaN(parseInt(content)) && killer.user[index].vote == -1 && killer.night & !killer.klr)
+            if(!isNaN(parseInt(content)) && killer.night & !killer.klr)
             {
               var num = parseInt(content) - 1;
               if(num < killer.userid.length && num >= 0)
               {
+                if(killer.user[index].vote == -1)
+                {
+                  msg.author.send("已經投票了喔!!\r\n如果要取消投票請打" + config.prefix + "C");
+                  return;
+                }
                 if(!killer.user[num].alive)
                 {
-                  msg.reply(killer.user[num].username + "已經死了喔!!");
+                  msg.author.send(killer.user[num].username + "已經死了喔!!");
                   return;
                 }
                 if(killer.user[num].role == 1)
                 {
-                  msg.reply(killer.user[num].username + "是殺手喔!!");
+                  msg.author.send(killer.user[num].username + "是殺手喔!!");
                   return;
                 }
                 killer.user[index].vote = num ;
@@ -463,12 +540,32 @@ bot.on("message", msg => {
               }
               return;
             }
+            //警察取消投票
+            if(content.slice(0,1)=="C" && killer.user[index].vote != -1)
+            {
+              killer.user[killer.user[index].vote].pvote--;
+              if(killer.user[index].vote == killer.plo)
+              {
+                for(var i = 0; i < killer.userid.length; i++)
+                {
+                  if(killer.user[i].pvote > killer.user[killer.plo].pvote)
+                  killer.plo = i;
+                }
+              }
+              killer.user[index].vote = -1;
+              msg.author.send("已取消投票!!");
+            }
             //警察投票阿
-            if(!isNaN(parseInt(content)) && killer.user[index].vote == -1 && killer.night & !killer.plr)
+            if(!isNaN(parseInt(content))  && killer.night & !killer.plr)
             {
               var num = parseInt(content) - 1;
               if(num < killer.userid.length && num >= 0)
               {
+                if(killer.user[index].vote == -1)
+                {
+                  msg.author.send("已經投票了喔!!\r\n如果要取消投票請打" + config.prefix + "C");
+                  return;
+                }
                 if(killer.user[num].check)
                 {
                   msg.reply(killer.user[num].username + "已經檢查過了喔!!");
@@ -527,7 +624,7 @@ bot.on("message", msg => {
       killer.plr = false;
       killer.klo = -1;
       killer.plo = -1;
-      killer.notv = killer.user.length;
+      killer.notv = killer.alnum;
       for(var i = 0; i < killer.userid.length; i++)
       {
         killer.user[i].vote = -1;
@@ -605,5 +702,80 @@ bot.on("message", msg => {
   }
 });
 
+bot.on("message", msg => {
+  // Voice only works in guilds, if the message does not come from a guild,
+  // we ignore it
+  if (!msg.guild) return;
 
+  if (msg.content === "lalalala") {
+    // Only try to join the sender's voice channel if they are in one themselves
+    if (msg.member.voiceChannel) {
+      msg.member.voiceChannel.join()
+        .then(connection => { // Connection is an instance of VoiceConnection
+          msg.reply("I have successfully connected to the channel!");
+          const dispatcher = connection.playStream(ytdl("https://www.youtube.com/watch?v=GMH7-TTDP4Q&t=7472s"));
+        })
+        .catch(console.log);
+    } else {
+      msg.reply("You need to join a voice channel first!");
+    }
+  }
+});
+
+const queue = {};
+
+const commands ={
+  "play": (msg) =>{
+    if(queue[msg.guild.id] === undefined)
+    return msg.channel.send("請先加入歌曲!!");
+    if(!msg.guild.voiceConnection)
+    return commands.join(msg).then(() => commands.play(msg));
+    if(queue[msg.guild.id].playing)
+    return msg.channel.send("正在播放中!!");
+    queue[msg.guild.id].playing = true;
+    //
+    (function play(song){
+      if(song === undefined)
+      {
+        queue[msg.guild.id].playing = false;
+        msg.guild.voiceConnection.channel.leave();
+        return msg.channel.send("請加入歌曲!!");
+      }
+      msg.channel.send("現正播放:" + song.title +"\n點播者:" + song.user);
+      msg.guild.voiceConnection.playStream(ytdl(song.url));
+    })(queue[msg.guild.id].songs.shift())
+  },
+  "join": (msg) =>{
+    return new Promise((resolve, reject) => {
+      var channel = msg.member.VoiceChannel;
+      if(!channel||channel.type !== "voice")return msg.channel.send("無法加入語音頻道!!請先確認自己在語音頻道內!!");
+      channel.join().then(connection => resolve(connection)).catch(err => reject(err));
+    });
+  },
+  "add": (msg) =>{
+    url = msg.content.slice(config.prefix + 2).trim();
+    if(url == "" || url == undefined)return msg.channel.send("需要輸入yuoutube網址");
+    ytdl.getInfo(url, (err, info) => {
+			if(err) return msg.channel.sendMessage("錯誤youtube連結" + err);
+			const ytplayer = msg.guild.voiceConnection.playStream(ytdl(url ,{ audioonly: true }));
+		});
+  },
+  "queue": (msg) =>{
+
+  }
+};
+
+bot.on("message", msg => {
+  if(msg.content.split(" ")[0] == config.prefix + "playurl")
+  {
+    url = msg.content.slice(config.prefix + 6).trim();
+    if(url == "" || url == undefined)return;
+    if(msg.member.voiceChannel)msg.member.voiceChannel.join();
+    if(!msg.guild.voiceConnection)return;
+    ytdl.getInfo(url, (err, info) => {
+			if(err) return msg.channel.sendMessage("錯誤youtube連結: " + err);
+			const ytplayer = msg.guild.voiceConnection.playStream(ytdl(url ,{ audioonly: true }));
+		});
+  }
+})
 bot.login(config.token);
