@@ -336,7 +336,7 @@ var killer = {
 
 bot.on("message", msg => {
   //申請遊戲
-  if (msg.content == config.prefix + "Mafia" && msg.channel.type != "text")
+  if (msg.content == config.prefix + "Mafia" && msg.channel.type == "text" && (!killer.joinstart))
   {
     msg.channel.send("<遊戲>殺手 已受理 請開始報名");
     killer.joinstart = true;
@@ -733,21 +733,54 @@ const commands ={
     if(queue[msg.guild.id].playing)
     return msg.channel.send("正在播放中!!");
     queue[msg.guild.id].playing = true;
+    const tchl = msg.channel;
     //
     (function play(song){
       if(song === undefined)
       {
         queue[msg.guild.id].playing = false;
-        msg.guild.voiceConnection.channel.leave();
         return msg.channel.send("請加入歌曲!!");
       }
-      msg.channel.send("現正播放:" + song.title +"\n點播者:" + song.user);
-      msg.guild.voiceConnection.playStream(ytdl(song.url));
+      dispatcher = msg.guild.voiceConnection.playStream(ytdl(song.url, { filter:"audioonly" }), {volume: 0.4});
+      var collector = msg.channel.createCollector(m => m.content.slice(0, config.prefix.length) == config.prefix);
+      collector.on("collect", m => {
+        comd = m.content.slice(config.prefix.length);
+        if(comd == "pause")
+        tchl.send("the music is pause.").then(() =>{ dispatcher.pause();});
+        else if(comd =="resume")
+        tchl.send("the music is resume.").then(() =>{ dispatcher.resume();});
+        else if(comd == "vol+")
+        {
+          if(dispatcher.volume >= 1)tchl.send("it is the highest volume.");
+          dispatcher.setVolume(Math.round((0.2 + dispatcher.volume)*10)/10);
+        }
+        else if(comd == "vol-")
+        {
+          if(dispatcher.volume <= 0.2)tchl.send("it is the lowest volume.");
+          else dispatcher.setVolume(Math.round((dispatcher.volume-0.2)*10)/10);
+        }
+        else if(comd == "skip" && (m.author == song.user||m.author.id == config.ownerID))
+        {
+          dispatcher.end();
+          play(queue[msg.guild.id].songs.shift());
+        }
+        else if(comd == "status")
+        msg.channel.send("現正播放\: " + song.title +"\r\n點播者\: " + song.user.username);
+      });
+      dispatcher.on("end",() => {
+        collector.stop();
+        play(queue[msg.guild.id].songs.shift());
+      });
+      dispatcher.on("error",err => {
+        tchl.send("error:"+err);
+        collector.stop();
+        play(queue[msg.guild.id].songs.shift());
+      });
     })(queue[msg.guild.id].songs.shift())
   },
   "join": (msg) =>{
     return new Promise((resolve, reject) => {
-      var channel = msg.member.VoiceChannel;
+      const channel = msg.member.voiceChannel;
       if(!channel||channel.type !== "voice")return msg.channel.send("無法加入語音頻道!!請先確認自己在語音頻道內!!");
       channel.join().then(connection => resolve(connection)).catch(err => reject(err));
     });
@@ -757,25 +790,28 @@ const commands ={
     if(url == "" || url == undefined)return msg.channel.send("需要輸入yuoutube網址");
     ytdl.getInfo(url, (err, info) => {
 			if(err) return msg.channel.sendMessage("錯誤youtube連結" + err);
-			const ytplayer = msg.guild.voiceConnection.playStream(ytdl(url ,{ audioonly: true }));
+      if(queue[msg.guild.id] == undefined)queue[msg.guild.id]={songs: [], playing:false};
+      queue[msg.guild.id].songs.push({title: info.title, user:msg.author, url: url});
 		});
   },
   "queue": (msg) =>{
-
+    if(queue[msg.guild.id] == undefined)return msg.channel.send("沒有歌曲喔QQ");
+    if(queue[msg.guild.id].songs[0]==undefined)return msg.channel.send("沒有歌曲喔QQ");
+    for(var i=0; i<10; i++)
+    {
+      if(queue[msg.guild.id].songs[i]==undefined)return;
+      msg.channel.send((i+1) + ". " + queue[msg.guild.id].songs[i].title + "  點播者\: " + queue[msg.guild.id].songs[i].user.username+"\r\n");
+    }
+    if(queue[msg.guild.id].songs[i]!=undefined)return msg.channel.send("...");
+    return;
   }
 };
 
 bot.on("message", msg => {
-  if(msg.content.split(" ")[0] == config.prefix + "playurl")
-  {
-    url = msg.content.slice(config.prefix + 6).trim();
-    if(url == "" || url == undefined)return;
-    if(msg.member.voiceChannel)msg.member.voiceChannel.join();
-    if(!msg.guild.voiceConnection)return;
-    ytdl.getInfo(url, (err, info) => {
-			if(err) return msg.channel.sendMessage("錯誤youtube連結: " + err);
-			const ytplayer = msg.guild.voiceConnection.playStream(ytdl(url ,{ audioonly: true }));
-		});
-  }
-})
+  if(msg.content.slice(0, config.prefix.length) == config.prefix && commands.hasOwnProperty(msg.content.slice(config.prefix.length).split(" ")[0]))
+  commands[msg.content.slice(config.prefix.length).split(" ")[0]](msg);
+});
+
+
+
 bot.login(config.token);
